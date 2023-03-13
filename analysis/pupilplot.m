@@ -1,0 +1,96 @@
+%% 
+function pupilplot(session_num,cond,alignment_pd)
+Save_loc='C:\Users\Usamma\Documents\analysis\patra\';
+analyzeSes(session_num); %comment out if trlist already retrieved
+trlists=evalin('base','trlists');
+range_pd=[-7 4];
+trlists=evalin('base','trlists');
+[axabig,tridsbig,databig,stampsbig]=tr_raster(trlists,'nlx','eyed','ttypes',{{'big','left'},{'post',cond}},'win',range_pd,'event',alignment_pd); % must fix "tbefore" variable in getpupilzs function when changing the event time point ("start or display target") for baseline subtraction
+[sebig,allzsbig, pdbig,outliersB2]=getpupilzs('big',databig,tridsbig,stampsbig);
+[axasmall,tridssmall,datasmall,stampssmall]=tr_raster(trlists,'nlx','eyed','ttypes',{{'small','left'},{'post',cond}},'win',range_pd,'event',alignment_pd);
+[sesmall,allzssmall,pdsmall,outliersS2]=getpupilzs('small',datasmall,tridssmall,stampssmall);
+%% Load data 
+lim=6000; 
+x=[-2:(6/lim):4]; %cuts the x-axis of the z score plot to the window of interest
+
+confx=[x x(end:-1:1)];
+pdbiglim=pdbig(1,5000:end-1);
+pdsmalllim=pdsmall(1,5000:end-1);
+sebiglim=sebig(1,5000:end-1);
+sesmalllim=sesmall(1,5000:end-1);
+
+bigconfy=[pdbiglim+sebiglim pdbiglim(end:-1:1)-sebiglim];
+smallconfy=[pdsmalllim+sesmalllim pdsmalllim(end:-1:1)-sesmalllim];
+
+figure %big vs small pupil zscore 
+psmall = fill(confx,smallconfy,'blue'); 
+psmall.FaceColor = [0.5 0.5 1];
+psmall.EdgeColor = 'none'; 
+hold on
+pbig = fill(confx, bigconfy,'red');  
+pbig.FaceColor = [1 0.5 0.5];
+pbig.EdgeColor = 'none';  
+
+switch alignment_pd
+    case 'display_target'
+        xline(0,'-',{'display target'});
+    case 'start_target'
+        xline(0,'-',{'start target'});
+    case 'display_fix'
+        xline(0,'-',{'display fix'});     
+end
+
+xlabel('time(s)');
+ylabel('z pupil diameter');
+title(append("Pupil diameter; Cond:",cond," Session#:",num2str(session_num)));
+legend('small','big')
+imtitle=append("Pupil_diameter_post_",cond,"_session_",num2str(session_num),alignment_pd);
+imtitle=append(imtitle,".png");
+sessionloc=append('chronic',num2str(session_num));
+exportgraphics(gcf,fullfile(Save_loc,sessionloc,filesep,imtitle),'Resolution',600);
+%% Plot histogram of all the outliser trials of three different methods
+% figure; %histogram of all the outlier trials 
+% subplot(1,3,1);
+% histogram(outliersB1,'BinWidth',5,'FaceColor','b'); %B stands for big reward trials 
+% title('First Method');
+% xlabel('Trial #');
+% subplot(1,3,2);
+% histogram(outliersB2,'BinWidth',5,'FaceColor','r');
+% title('Second Method');
+% xlabel('Trial #');
+% subplot(1,3,3);
+% histogram(outliersB3,'BinWidth',5,'FaceColor','g');
+% title('Third Method');
+% xlabel('Trial #')
+%% 
+switch alignment_pd
+    case 'display_target'
+        time=1.8;
+        plotsize=3;
+    case 'start_target'
+        time=2.4;
+        plotsize=4;
+end
+num_s=0*1000; %start time point of time window
+s=num_s+7000; %start index
+b=200; %0.2s time bins
+num_f=time*1000; %final time point of interest
+n=((num_f-num_s)/b); %number of bins
+
+figure; %histogram of the z scores in the window of interest [big vs small rewards]
+set(gcf, 'Position', [1000 750 750 600]);
+for i=1:n
+    subplot(plotsize,3,i)
+    histogram(pdbig(1,s+i:s+b))
+    hold on
+    histogram(pdsmall(1,s+i:s+b))
+    title(append("Time bin (s):", num2str((num_s/1000)+((b/1000)*(i-1))),"-",num2str((num_s/1000)+((b/1000)*(i)))))
+    s=s+b;
+end
+sgtitle(append("Session#:",num2str(session_num))); 
+legend('big','small')
+imtitle=append("Histogram_Pupil_diameter_post_",cond,"_session_",num2str(session_num),alignment_pd);
+imtitle=append(imtitle,".png");
+sessionloc=append('chronic',num2str(session_num));
+exportgraphics(gcf,fullfile(Save_loc,sessionloc,filesep,imtitle),'Resolution',600);
+close all

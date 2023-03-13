@@ -1,0 +1,150 @@
+%% 
+function [se,allzscores,pupil_avg,outlier_trials2]=getpupilzs(rewardsize,dataL,trids,stamps)
+
+% Plots average of z scores across all trials within a session during trial
+% After running analyzeSes(sessnum) run tr_raster:
+
+% 6/26/2022
+switch(rewardsize)
+    case char('big')
+        rownum=4;
+    case char('small')
+        rownum=5;
+end
+
+% if rewardsize==1; %big
+%     rownum=4;
+% elseif rewardsize==2; %small
+%     rownum=5;
+% end 
+
+stamps_1000=1000*stamps; %rounds time stamps to 3rd decimal
+stamps_ind=floor(stamps_1000);
+stamps_ind=stamps_ind(:,1,1); %changed here
+stamps_ind(find(stamps_ind(:,1)>0))=[]; %changed here
+stamps_ind(find(stamps_ind(:,1)<-2000))=[]; %changed here
+
+stamps_rew=stamps(:,rownum); %gets the reward time points
+stamps_rew(stamps_rew<=0)=nan;
+ind_end=floor(stamps_rew*1000);
+
+for i=1:size(dataL,2)
+    dataL_mean2(:,i)=mean(dataL(:,i),'omitnan'); %calculates mean of all trials without nans
+    dataL_std2(:,i)=std(dataL(:,i),'omitnan'); %calculates std of all trials without nans 
+end
+%% Removing outliers #1: using mean and std within trial; DISREGARD 
+bound=2.5;
+lower=dataL_mean2-bound.*dataL_std2; %lower bound of filter 
+upper=dataL_mean2+bound.*dataL_std2; %upper bound of filter 
+dataL1=dataL; %save dataL (before outliers removal) to compare with dataL1 (after outliers removal)
+
+% for i=1:size(dataM,2)
+%     for j=1:size(dataM,1)
+%       if dataM(j,i)<=lower(:,i)|dataM(j,i)>=upper(:,i) %if data point is out of bounds
+%          dataM(j,:)=nan; %nan the entire trial that includes outliers
+%       end
+%     end
+% end 
+
+for i=1:size(dataL1,2)
+    for j=1:size(dataL1,1)
+      if dataL1(j,i)>=upper(:,i) %if data point is out of bounds
+         dataL1(j,:)=nan; %nan the entire trial that includes outliers
+      end
+    end
+end 
+
+check=0; %initialize "check" to count number of outlier trials 
+outlier=ones(length(ind_end),1); %creates a matrix of ones 
+for i=1:size(dataL1,1)
+    if sum(isnan(dataL1(i,:)))==size(dataL1,2); %if the entire trial is a nan (outlier trials)
+        outlier(i,:)=0; %turns the outlier trial# to 0 to keep track of the actual outlier trials 
+        check=check+1; %updates "check" everytime an outlier trial is detected 
+    end
+end
+outlier_trials=find(outlier==0); %outlier trial #s 
+%% [THIS ONE USED FOR "pupilplot"] Removing outliers #2: using mean and std before trial start 
+% if sum(stamps_ind(:,1))>0
+
+tbefore=5; %5 secs before display_start & 4 secs before start_target
+fix=stamps_ind(:,1)+7000; %index of display_fix for all trials
+fix_before=7000+(stamps_ind(:,1)-tbefore*1000); %index of 5 secs before display _fix
+dataL2=dataL; %save dataL (before outliers removal) to compare with dataL2 (after outliers removal)
+
+%     fix_avg1=mean(stamps_ind(:,1)); %mean of all fix stamps
+%     fix_std1=std(stamps_ind(:,1)); %std of all fix stamps
+%     thres1=3; %threshold assignment
+%     for i=1:length(ind_end)
+%         if stamps_ind(i)>=mean(fix_avg1,'omitnan')+thres1*mean(fix_std1,'omitnan'); %filters out outlier stamps
+%             fix(i,:)=0; %zeros out the outliers
+%             fix_before(i,:)=0;
+%         end
+%     end
+
+for i=1:length(fix)
+    dataL_disp=dataL2(i,fix_before(i):fix(i)); %obtains data points in time window of interest (5 sec before trial start)
+    fix_avg2(i,:)=mean(dataL_disp,'omitnan');
+    fix_std2(i,:)=std(dataL_disp,'omitnan');
+end
+
+thres2=1; %threshold assignment
+fix_upper=mean(fix_avg2,'omitnan')+thres2.*mean(fix_std2,'omitnan'); %upper bound of filter
+for j=1:length(fix) % changed here
+    dataK_disp=dataL2(j,fix_before(j):fix(j));
+    if mean(dataK_disp,'omitnan')>=fix_upper %if data point is out of bounds
+        dataL2(j,:)=nan; %zeros the entire trial that includes outliers
+    end
+end
+check2=0; %initialize "check" to count number of outlier trials
+outlier2=ones(length(ind_end),1); %creates a matrix of ones
+for i=1:size(dataL2,1)
+    if sum(~isnan(dataL2(i,:)))==0; %if the entire trial is a nan (outlier trials)
+        outlier2(i,:)=0; %turns the outlier trial# to 0 to keep track of the actual outlier trials
+        check2=check2+1; %updates "check" everytime an outlier trial is detected
+    end
+end
+outlier_trials2=trids(find(outlier2==0)); %outlier trial #s
+
+%% Removing outliers #3: using std within trial 
+%incorrect method of removal; DISREGARD
+thres2=1.15;
+for i=1:size(dataL,1)
+    dataL_std3(i,:)=std(dataL(i,:),'omitnan'); %calculates std of all trials without nans 
+end
+std_upper=thres2*mean(dataL_std3); %sets threshold 
+dataL3=dataL; %save dataL (before outliers removal) to compare with dataL3 (after outliers removal)
+for j=1:size(dataL3,1)
+    if dataL_std3(j,:)>=std_upper %if data point is out of bounds
+        dataL3(j,:)=nan; %nan the entire trial that includes outliers
+    end
+end
+check3=0; %initialize "check" to count number of outlier trials 
+outlier3=ones(length(ind_end),1); %creates a matrix of ones 
+for i=1:size(dataL3,1)
+    if sum(isnan(dataL3(i,:)))==size(dataL3,2); %if the entire trial is a nan (outlier trials)
+        outlier3(i,:)=0; %turns the outlier trial# to 0 to keep track of the actual outlier trials 
+        check3=check3+1; %updates "check" everytime an outlier trial is detected 
+    end
+end
+outlier_trials3=find(outlier3==0); %outlier trial #s 
+%% Calculating zscore and standard error 
+for i=size(dataL2,1)
+    if dataL2(i,:)==0; 
+        dataL2(i,:)=nan; %converts 
+    end
+end
+dataA=dataL2; %assign dataA to second method for filtering from above
+for i=1:length(ind_end)
+    % data_cut=dataL(i,[1:ind_end(i)]);
+  % gap=max_ind-length(data_cut);
+  % addnans=nan(1,gap);
+  % data_new(i,:)=[data_cut addnans]
+    dataL_mean1=mean(dataA(i,:),'omitnan'); %calculates the mean of each dataM trial without nan 
+    dataL_std1=std(dataA(i,:),'omitnan'); %calculates the std of each dataM trial  without nan
+    zs=(dataA(i,:)-dataL_mean1)/dataL_std1; %calculates the zscore of each dataA trial 
+    zscore1(i,:)=zs; %saves all calculated zscores 
+end
+allzscores=zscore1;
+se=std(zscore1,0,1,'omitnan')./sqrt(size((dataA),1)-check2); %calculates the standard error of dataM
+pupil_avg=mean(zscore1,'omitnan'); %calculates the average of calculated zscores 
+end
